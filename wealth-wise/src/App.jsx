@@ -14,13 +14,13 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 // 🔴 Firebase 設定區
 // ---------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "AIzaSyDTBf7vyxrVxya18GL-JIt06WE4w2S257E",
-  authDomain: "wealth-management-12d1a.firebaseapp.com",
-  projectId: "wealth-management-12d1a",
-  storageBucket: "wealth-management-12d1a.firebasestorage.app",
-  messagingSenderId: "11629933495",
-  appId: "1:11629933495:web:9ba067ecc42b85e2fcae32",
-  measurementId: "G-D014HC4B1C"
+  apiKey: import.meta.env.apiKey,
+  authDomain: import.meta.env.authDomain,
+  projectId: import.meta.env.projectId,
+  storageBucket: import.meta.env.storageBucket,
+  messagingSenderId: import.meta.env.messagingSenderId,
+  appId: import.meta.env.appId,
+  measurementId: import.meta.env.measurementId
 };
 
 let app, db, auth;
