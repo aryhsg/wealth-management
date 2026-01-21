@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   PieChart, TrendingUp, Download, Target, AlertCircle, RefreshCw, 
   Calculator, Home, Coins, Landmark, ShieldCheck, Plane, FileText, 
-  Cloud, Check, Briefcase, Car, TrendingDown, Wallet, ChevronRight, Save,
-  User, LogOut, Mail, Lock, UserPlus, LogIn, X, Lightbulb, Sparkles, TrendingUp as GrowthIcon
+  Cloud, Check, Briefcase, TrendingDown, Wallet, ChevronRight, Save,
+  User, LogOut, Mail, Lock, UserPlus, LogIn, X, Lightbulb, Sparkles, CircleDollarSign  as GrowthIcon
 } from 'lucide-react';
 
 // --- Firebase SDK Imports ---
@@ -190,22 +190,27 @@ const App = () => {
     nonLiquid: { realEstate: 15000000, car: 800000, other: 200000 }
   });
   const [expenses, setExpenses] = useState({
-    monthly: { housing: 25000, living: 15000, transport: 3000, entertainment: 5000 },
-    yearly: { insurance: 60000, tax: 25000, travel: 80000 }
+    monthly: { "房貸/房租": 25000, 伙食費: 15000, 交通費: 3000, 娛樂費: 5000 },
+    yearly: { 保險: 60000, 稅務: 25000, 旅遊: 80000, 貸款: 0 }
+  });
+    const [incomes, setIncomes] = useState({
+    monthly: { 月薪: 25000, 獎金: 15000 }
   });
 
   // 計算邏輯
   const stats = useMemo(() => {
+    const annualIncome = (incomes.monthly.月薪 * 12) + (incomes.monthly.獎金 || 0);
     const monthlyTotal = Object.values(expenses.monthly).reduce((a, b) => a + b, 0);
     const yearlyOneOffTotal = Object.values(expenses.yearly).reduce((a, b) => a + b, 0);
     const totalAnnualExpense = (monthlyTotal * 12) + yearlyOneOffTotal;
-    const annualAssetIncrease = income - totalAnnualExpense;
+    const annualAssetIncrease = annualIncome - totalAnnualExpense;
     const monthlySavings = annualAssetIncrease / 12;
     const totalLiquid = Object.values(assets.liquid).reduce((a, b) => a + b, 0);
     const totalNonLiquid = Object.values(assets.nonLiquid).reduce((a, b) => a + b, 0);
     const totalAssets = totalLiquid + totalNonLiquid;
     const fireGoal = manualGoal !== null ? manualGoal : totalAnnualExpense * 25;
-    const savingsRate = income > 0 ? (annualAssetIncrease / income) * 100 : 0;
+    const savingsRate = annualIncome > 0 ? (annualAssetIncrease / annualIncome) * 100 : 0;
+    
     
     // 緊急預備金水位 (6個月開支)
     const emergencyFundGoal = monthlyTotal * 6;
@@ -222,9 +227,10 @@ const App = () => {
       fireGoal, 
       savingsRate,
       emergencyFundGoal,
-      emergencyFundStatus
+      emergencyFundStatus,
+      annualIncome
     };
-  }, [assets, expenses, income, manualGoal]);
+  }, [assets, expenses, income, manualGoal, incomes]);
 
   // Auth 監聽
   useEffect(() => {
@@ -318,7 +324,7 @@ const App = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: userPrompt }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] }
+            systemInstruction: { parts: [{ text: systemPrompt}] }
           })
         });
 
@@ -347,6 +353,30 @@ const App = () => {
   };
 
   if (isLoading) return <div className="h-screen flex items-center justify-center bg-slate-50"><RefreshCw className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+
+
+  // --- 圓餅圖路徑 ---
+  const getPiePath = (startPct, endPct) => {
+    const x1 = Math.cos(2 * Math.PI * startPct);
+    const y1 = Math.sin(2 * Math.PI * startPct);
+    const x2 = Math.cos(2 * Math.PI * endPct);
+    const y2 = Math.sin(2 * Math.PI * endPct);
+    const largeArc = endPct - startPct > 0.5 ? 1 : 0;
+    return `M 0 0 L ${x1} ${y1} A 1 1 0 ${largeArc} 1 ${x2} ${y2} L 0 0`;
+  };
+
+  const pieData = [
+    { label: '現金', value: assets.liquid.cash, color: '#4F46E5' },
+    { label: '股票', value: assets.liquid.stock, color: '#3B82F6' },
+    { label: '債券', value: assets.liquid.bond, color: '#60A5FA' },
+    { label: '房產', value: assets.nonLiquid.realEstate, color: '#94A3B8' },
+    { label: '其他', value: assets.nonLiquid.car + assets.nonLiquid.other, color: '#CBD5E1' },
+  ].map((point, i, arr) => {
+    const total = arr.reduce((sum, p) => sum + p.value, 0);
+    const pct = point.value / total || 0;
+    const start = arr.slice(0, i).reduce((sum, p) => sum + (p.value / total || 0), 0);
+    return { ...point, pct, start, end: start + pct };
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-24">
@@ -410,7 +440,7 @@ const App = () => {
         {activeTab === 'assets' && (
           <div className="grid lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="lg:col-span-5 space-y-6">
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
                 <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
                   <div className="p-1.5 bg-indigo-50 rounded-lg"><Coins className="w-4 h-4 text-indigo-600" /></div> 流動資產
                 </h2>
@@ -419,7 +449,7 @@ const App = () => {
                 <AssetInputRow label="債券 / 基金" value={assets.liquid.bond} max={5000000} step={10000} onChange={v => setAssets({...assets, liquid: {...assets.liquid, bond: v}})} />
               </div>
 
-              <div className={`p-6 rounded-3xl border shadow-sm transition-all ${stats.emergencyFundStatus ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
+              <div className={`p-6 rounded-3xl border shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all ${stats.emergencyFundStatus ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className={`font-bold ${stats.emergencyFundStatus ? 'text-emerald-900' : 'text-amber-900'}`}>緊急預備金診斷</h3>
@@ -435,7 +465,7 @@ const App = () => {
                 </p>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
                 <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
                   <div className="p-1.5 bg-slate-100 rounded-lg"><Home className="w-4 h-4 text-slate-600" /></div> 非流動資產
                 </h2>
@@ -445,44 +475,82 @@ const App = () => {
 
               </div>
             </div>
-            <div className="lg:col-span-7 flex flex-col items-center justify-center bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="lg:col-span-7 flex flex-col items-center justify-center bg-white p-10 rounded-3xl border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
                <div className="relative mb-10">
-                  <svg viewBox="-1.2 -1.2 2.4 2.4" className="w-72 h-72 transform -rotate-90 filter drop-shadow-xl">
-                    <circle cx="0" cy="0" r="0.8" fill="#f1f5f9" />
-                    <circle cx="0" cy="0" r="0.65" fill="white" />
+                  <svg viewBox="-1.2 -1.2 2.4 2.4" className="w-64 h-64 md:w-80 md:h-80 transform -rotate-90">
+                    {pieData.map((slice, i) => <path key={i} d={getPiePath(slice.start, slice.end)} fill={slice.color} stroke="white" strokeWidth="0.02" />)}
+                    <circle cx="0" cy="0" r="0.6" fill="white" />
                   </svg>
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">目前總資產</p>
-                    <p className="text-4xl font-black text-slate-900">${(stats.totalAssets/10000).toFixed(0)}萬</p>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                    <p className="text-emerald-400 text-sm font-bold">總資產</p>
+                    <p className="text-2xl font-bold">${(stats.totalAssets/10000).toFixed(0)}萬</p>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 w-full">
+                  {pieData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span className="w-3 h-3 rounded-full" style={{backgroundColor: item.color}}></span>
+                      <span className="text-slate-600">{item.label}</span>
+                      <span className="ml-auto font-mono">{(item.pct * 100).toFixed(1)}%</span>
+                    </div>
+                  ))}
                 </div>
             </div>
           </div>
         )}
 
         {activeTab === 'expenses' && (
-          <div className="grid lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
              <div className="lg:col-span-8 space-y-6">
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-                  <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                    <Briefcase className="w-5 h-5 text-indigo-500" /> 年度總收入 (淨額)
+                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.3)] ">
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 whitespace-nowrap">
+                    <Wallet className="w-5 h-5 text-indigo-500" /> 年度總收入 
+                    <p className={`text-3xl font-black text-emerald-500 font-mono ${stats.annualIncome >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>${stats.annualIncome.toLocaleString()}</p>
+
                   </h2>
-                  <input type="number" value={income} onChange={e => setIncome(parseInt(e.target.value) || 0)} className="w-full p-4 bg-slate-50 border rounded-2xl text-3xl font-black font-mono text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-100" />
-                </div>
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-                  <h2 className="text-lg font-bold text-slate-800 mb-6">每月開支明細</h2>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {Object.entries(expenses.monthly).map(([k, v]) => (
-                      <div key={k} className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{k}</label>
-                        <input type="number" value={v} onChange={e => setExpenses({...expenses, monthly: {...expenses.monthly, [k]: parseInt(e.target.value) || 0}})} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono focus:bg-white transition-all" />
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries(incomes.monthly).map(([k, v]) => (
+                      <div key={k} className="flex flex-col gap-2">
+                        <label className="text-[15px] font-bold text-slate-400 uppercase tracking-widest ml-1">{k}</label>
+                        <input type="number" min="0" placeholder='0' value={v === 0 ? "" : v} onChange={e => setIncomes({...incomes, monthly: {...incomes.monthly, [k]: parseInt(e.target.value) || 0}})} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono focus:bg-white transition-all" />
                       </div>
                     ))}
                   </div>
+                
+                </div>
+                <div className="bg-white p-8 rounded-[3rem] flex flex-col gap-4 border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.3)]  ">
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 whitespace-nowrap">
+                    <Wallet className="w-5 h-5 text-indigo-500" /> 年度總支出 
+                    <p className={`text-3xl font-black text-emerald-500 font-mono ${stats.totalAnnualExpense >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>${stats.totalAnnualExpense.toLocaleString()}</p>
+
+                  </h2>
+                    <div className="bg-white p-8 rounded-2xl shadow-md">
+                      <h3 className="text-md font-bold text-slate-800 mb-6">每月開支</h3>
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          {Object.entries(expenses.monthly).map(([k, v]) => (
+                            <div key={k} className="space-y-1">
+                              <label className="text-[15px] font-bold text-slate-400 uppercase tracking-widest ml-1">{k}</label>
+                              <input type="number" min="0" placeholder='0' value={v === 0 ? "" : v} onChange={e => setExpenses({...expenses, monthly: {...expenses.monthly, [k]: parseInt(e.target.value) || 0}})} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono focus:bg-white transition-all" />
+                            </div>
+                          ))}
+                        </div>
+                    </div>  
+
+                    <div className="bg-slate-40 p-8 rounded-2xl shadow-md ">
+                      <h3 className="text-md font-bold text-slate-800 mb-6">其餘開支</h3>
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          {Object.entries(expenses.yearly).map(([k, v]) => (
+                            <div key={k} className="space-y-1">
+                              <label className="text-[15px] font-bold text-slate-400 uppercase tracking-widest ml-1">{k}</label>
+                              <input type="number" min="0" placeholder='0' value={v === 0 ? "" : v} onChange={e => setExpenses({...expenses, yearly: {...expenses.yearly, [k]: parseInt(e.target.value) || 0}})} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono focus:bg-white transition-all" />
+                            </div>
+                          ))}
+                        </div>
+                    </div>  
                 </div>
              </div>
-             <div className="lg:col-span-4">
-                <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
+             <div className="lg:col-span-4 sticky top-6">
+                <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-[0_10px_30px_rgba(0,0,0,0.3)]  relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16"></div>
                   <p className="text-slate-400 text-xs font-bold uppercase mb-2">年度結餘</p>
                   <p className={`text-4xl font-black ${stats.annualAssetIncrease >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>${stats.annualAssetIncrease.toLocaleString()}</p>
@@ -505,6 +573,24 @@ const App = () => {
            <div className="grid lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="lg:col-span-4 space-y-6">
                 <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+
+                  <h2 className="text-lg font-bold text-slate-800 mb-4">FIRE 參數設定</h2>
+                  <div className="p-4 bg-slate-50 rounded-xl border mb-6">
+                    <span className="text-xs font-bold text-slate-500 uppercase block mb-1">目前總資產</span>
+                    <span className="text-xl font-mono font-bold text-slate-700">${stats.totalAssets.toLocaleString()}</span>
+                  </div>
+                  <div className="mb-6">
+                    <div className="flex justify-between mb-2">
+                      <label className="text-xs font-bold text-slate-500">設定目標金額</label>
+                      <button onClick={() => setManualGoal(null)} className="text-xs text-indigo-500 hover:underline">還原預設</button>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                      <input type="number" value={stats.fireGoal} onChange={(e) => setManualGoal(parseInt(e.target.value) || 0)} className="w-full pl-8 pr-4 py-2 bg-indigo-50 border border-indigo-100 rounded-lg font-mono font-bold text-indigo-700" />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">* 建議 (25倍支出): ${(stats.totalAnnualExpense * 25).toLocaleString()}</p>
+                  </div>
+
                   <h2 className="text-lg font-bold text-slate-800 mb-6">財務自由參數</h2>
                   <div className="mb-8 p-6 bg-slate-50 rounded-2xl border">
                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-4">預期報酬率 ({returnRate}%)</label>
