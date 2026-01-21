@@ -3,9 +3,9 @@ import {
   PieChart, TrendingUp, Download, Target, AlertCircle, RefreshCw, 
   Calculator, Home, Coins, Landmark, ShieldCheck, Plane, FileText, 
   Cloud, Check, Briefcase, TrendingDown, Wallet, ChevronRight, Save,
-  User, LogOut, Mail, Lock, UserPlus, LogIn, X, Lightbulb, Sparkles, CircleDollarSign  as GrowthIcon
+  User, LogOut, Mail, Lock, UserPlus, LogIn, X, Lightbulb, Sparkles as GrowthIcon
 } from 'lucide-react';
-
+import {ArrowRight, Sparkles, Coffee, Heart, Gem, ChevronDown} from 'lucide-react';
 // --- Firebase SDK Imports ---
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -37,8 +37,123 @@ const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : import.meta.env.VITE_FIREBASE_APP_ID;
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY; // Gemini API Key (Runtime provides this)
 
+
 // ---------------------------------------------------------
-// 🟢 子組件 1：會員登入/註冊彈窗
+// 🟢 常數定義：FIRE 模式
+// ---------------------------------------------------------
+const FIRE_MODES = [
+  { id: 'lean', name: 'Lean FIRE (簡約型)', multiplier: 20, icon: <Coffee className="w-4 h-4" />, desc: '適合追求極簡生活、開銷極低的使用者。' },
+  { id: 'standard', name: 'Standard FIRE (經典型)', multiplier: 25, icon: <Target className="w-4 h-4" />, desc: '基於著名的 4% 法則，最平衡的退休方案。' },
+  { id: 'chubby', name: 'Chubby FIRE (舒適型)', multiplier: 30, icon: <Heart className="w-4 h-4" />, desc: '提供更寬裕的旅遊與生活預算，不用斤斤計較。' },
+  { id: 'fat', name: 'Fat FIRE (奢華型)', multiplier: 33, icon: <Gem className="w-4 h-4" />, desc: '極高度的安全邊際，支持高品質的優渥生活。' },
+  { id: 'barista', name: 'Barista FIRE (兼職型)', multiplier: 15, icon: <Briefcase className="w-4 h-4" />, desc: '只需存夠部分資金，其餘靠輕鬆的興趣兼職負擔。' },
+];
+
+// 固定開支欄位的順序與名稱，避免登入後 Firestore 回傳順序變動導致 UI 閃爍
+const EXPENSE_LABELS = {
+  housing: '房租 / 房貸',
+  living: '餐飲生活',
+  transport: '交通通訊',
+  entertainment: '休閒社交'
+};
+
+// 固定開支欄位的順序與名稱，避免登入後 Firestore 回傳順序變動導致 UI 閃爍
+const FIX_EXPENSE_LABELS = {
+  insurance: '保險',
+  tax: '稅務',
+  travel: '旅遊',
+  loan: '貸款'
+};
+
+// ---------------------------------------------------------
+// 🟢 子組件 1：引導介紹彈窗 (New)
+// ---------------------------------------------------------
+const IntroModal = ({ isOpen, onClose }) => {
+  const [step, setStep] = useState(1);
+  const totalSteps = 3;
+
+  if (!isOpen) return null;
+
+  const content = [
+    {
+      title: "歡迎來到 WealthWise",
+      subtitle: "您的專屬 FIRE 財務自由顧問",
+      description: "這不只是一個計算機，而是一個幫助您掌控人生的財務規劃系統。讓我們一起邁向財務自由之路。",
+      icon: <Landmark className="w-12 h-12 text-white" />,
+      bg: "bg-indigo-600"
+    },
+    {
+      title: "什麼是 FIRE？",
+      subtitle: "Financial Independence, Retire Early",
+      description: "核心觀念包含「4% 法則」：當您的投資資產達到年支出的 25 倍時，靠著每年 4% 的提領，理論上您可以永遠不再為錢工作。",
+      icon: <Flame className="w-12 h-12 text-white" />,
+      bg: "bg-orange-500"
+    },
+    {
+      title: "如何使用此系統？",
+      subtitle: "四步驟完成規劃",
+      description: "1. 輸入資產與開支。 2. 設定 FIRE 目標。 3. 查看成長曲線模擬。 4. 點擊 AI 顧問獲得深度理財建議。",
+      icon: <Target className="w-12 h-12 text-white" />,
+      bg: "bg-emerald-500"
+    }
+  ];
+
+  const current = content[step - 1];
+
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-500">
+      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className={`p-12 ${current.bg} transition-colors duration-500 flex flex-col items-center text-center text-white`}>
+          <div className="mb-6 p-4 bg-white/20 rounded-3xl backdrop-blur-sm">
+            {current.icon}
+          </div>
+          <h2 className="text-3xl font-black mb-2">{current.title}</h2>
+          <p className="text-white/80 font-bold uppercase tracking-widest text-xs">{current.subtitle}</p>
+        </div>
+        
+        <div className="p-10 text-center">
+          <p className="text-slate-600 text-lg leading-relaxed mb-10 min-h-[80px]">
+            {current.description}
+          </p>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${step === i ? 'w-8 bg-indigo-600' : 'w-2 bg-slate-200'}`} />
+              ))}
+            </div>
+            
+            {step < totalSteps ? (
+              <button 
+                onClick={() => setStep(step + 1)}
+                className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all"
+              >
+                下一步 <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button 
+                onClick={onClose}
+                className="flex items-center gap-2 px-10 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all"
+              >
+                立即開始 <Check className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 輔助組件：FIRE 小標誌
+const Flame = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  </svg>
+);
+
+// ---------------------------------------------------------
+// 🟢 子組件 2：會員登入/註冊彈窗
 // ---------------------------------------------------------
 const AuthModal = ({ mode, setMode, onAuthSuccess }) => {
   const [email, setEmail] = useState('');
@@ -175,26 +290,27 @@ const App = () => {
   const [status, setStatus] = useState('idle');
   const [authMode, setAuthMode] = useState(null); 
   const [isLoading, setIsLoading] = useState(true);
-
+  const [showIntro, setShowIntro] = useState(true); // 控制導覽彈窗
   // AI 顧問狀態
   const [aiAdvice, setAiAdvice] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
-
+  // FIRE 模式
+  const [fireModeId, setFireModeId] = useState('standard'); // 預設經典模式
   // 核心數據
   const [income, setIncome] = useState(1200000); 
   const [manualGoal, setManualGoal] = useState(null);
   const [returnRate, setReturnRate] = useState(6);
   const [assets, setAssets] = useState({
-    liquid: { cash: 300000, stock: 1200000, bond: 500000 },
-    nonLiquid: { realEstate: 15000000, car: 800000, other: 200000 }
+    liquid: { cash: 0, stock: 0, bond: 0 },
+    nonLiquid: { realEstate: 0, car: 0, other: 0 }
   });
   const [expenses, setExpenses] = useState({
-    monthly: { "房貸/房租": 25000, 伙食費: 15000, 交通費: 3000, 娛樂費: 5000 },
-    yearly: { 保險: 60000, 稅務: 25000, 旅遊: 80000, 貸款: 0 }
+    monthly: { "房貸/房租": 0, 伙食費: 0, 交通費: 0, 娛樂費: 0 },
+    yearly: { 保險: 0, 稅務: 0, 旅遊: 0, 貸款: 0 }
   });
     const [incomes, setIncomes] = useState({
-    monthly: { 月薪: 25000, 獎金: 15000 }
+    monthly: { 月薪: 0, 獎金: 0 }
   });
 
   // 計算邏輯
@@ -208,10 +324,15 @@ const App = () => {
     const totalLiquid = Object.values(assets.liquid).reduce((a, b) => a + b, 0);
     const totalNonLiquid = Object.values(assets.nonLiquid).reduce((a, b) => a + b, 0);
     const totalAssets = totalLiquid + totalNonLiquid;
-    const fireGoal = manualGoal !== null ? manualGoal : totalAnnualExpense * 25;
     const savingsRate = annualIncome > 0 ? (annualAssetIncrease / annualIncome) * 100 : 0;
     
-    
+    // 獲取當前選擇的模式
+    const selectedMode = FIRE_MODES.find(m => m.id === fireModeId);
+    // 計算該模式目標：年支出 * 模式倍數
+    const modeCalculatedGoal = totalAnnualExpense * selectedMode.multiplier;
+    // 如果手動輸入為 null，使用模式計算結果
+    const fireGoal = manualGoal !== null ? manualGoal : modeCalculatedGoal;
+
     // 緊急預備金水位 (6個月開支)
     const emergencyFundGoal = monthlyTotal * 6;
     const emergencyFundStatus = assets.liquid.cash >= emergencyFundGoal;
@@ -228,9 +349,11 @@ const App = () => {
       savingsRate,
       emergencyFundGoal,
       emergencyFundStatus,
-      annualIncome
+      annualIncome,
+      modeCalculatedGoal,
+      selectedMode
     };
-  }, [assets, expenses, income, manualGoal, incomes]);
+  }, [assets, expenses, income, manualGoal, incomes, fireModeId]);
 
   // Auth 監聽
   useEffect(() => {
@@ -253,7 +376,7 @@ const App = () => {
         const data = docSnap.data();
         if (data.assets) setAssets(data.assets);
         if (data.expenses) setExpenses(data.expenses);
-        if (data.income !== undefined) setIncome(data.income);
+        if (data.incomes !== undefined) setIncomes(data.incomes);
         if (data.manualGoal !== undefined) setManualGoal(data.manualGoal);
         if (data.returnRate !== undefined) setReturnRate(data.returnRate);
         setStatus('saved');
@@ -270,11 +393,11 @@ const App = () => {
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data');
-        await setDoc(docRef, { income, assets, expenses, manualGoal, returnRate, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(docRef, { incomes, assets, expenses, manualGoal, returnRate, updatedAt: new Date().toISOString() }, { merge: true });
         setStatus('saved');
       } catch (e) { setStatus('error'); }
     }, 2000);
-  }, [assets, expenses, income, manualGoal, returnRate, user]);
+  }, [assets, expenses, incomes, manualGoal, returnRate, user]);
 
   const fireProjection = useMemo(() => {
     let current = stats.totalLiquid; 
@@ -380,6 +503,8 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-24">
+      {/* 1. 導覽引導彈窗 */}
+      <IntroModal isOpen={showIntro} onClose={() => setShowIntro(false)} />
       <AuthModal mode={authMode} setMode={setAuthMode} />
 
       <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200 shadow-sm">
@@ -394,32 +519,41 @@ const App = () => {
             </div>
           </div>
           
-          <div className="flex bg-slate-100 p-1 rounded-xl text-sm font-semibold">
-            {[
-              { id: 'assets', label: '資產', icon: Coins },
-              { id: 'expenses', label: '開支', icon: Calculator },
-              { id: 'fire', label: 'FIRE', icon: Target },
-              { id: 'advisor', label: 'AI 顧問', icon: Sparkles }
-            ].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === tab.id ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>
-                <tab.icon className="w-3.5 h-3.5 sm:block hidden" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-3">
-            {user && !user.isAnonymous ? (
-              <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-                <button onClick={() => signOut(auth)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors">
-                  <LogOut className="w-5 h-5" />
+          {/* 右側導覽區域 (分頁 + 會員狀態) */}
+          <div className="flex items-center gap-8">
+            <div className="flex bg-slate-100 p-1 rounded-xl text-sm font-semibold">
+              {[
+                { id: 'assets', label: '資產', icon: Coins },
+                { id: 'expenses', label: '開支', icon: Calculator },
+                { id: 'fire', label: 'FIRE', icon: Target },
+                { id: 'advisor', label: 'AI顧問', icon: Sparkles }
+              ].map(tab => (
+                <button 
+                  key={tab.id} 
+                  onClick={() => setActiveTab(tab.id)} 
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === tab.id ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-indigo-600'}`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
                 </button>
-              </div>
-            ) : (
-              <button onClick={() => setAuthMode('login')} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md">
-                <User className="w-4 h-4" /> 登入
-              </button>
-            )}
+              ))}
+            </div>
+
+            {/* 會員狀態與按鈕 */}
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-8">
+              {user && !user.isAnonymous ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-500 truncate max-w-[120px] hidden md:block">{user.email}</span>
+                  <button onClick={() => signOut(auth)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors">
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : ( 
+                <button onClick={() => setAuthMode('login')} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-100 transition-all active:scale-95 flex items-center gap-2">
+                  <User className="w-4 h-4" /> 登入
+                </button> 
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -510,9 +644,9 @@ const App = () => {
                   </h2>
                   <div className="grid grid-cols-2 gap-4">
                     {Object.entries(incomes.monthly).map(([k, v]) => (
-                      <div key={k} className="flex flex-col gap-2">
-                        <label className="text-[15px] font-bold text-slate-400 uppercase tracking-widest ml-1">{k}</label>
-                        <input type="number" min="0" placeholder='0' value={v === 0 ? "" : v} onChange={e => setIncomes({...incomes, monthly: {...incomes.monthly, [k]: parseInt(e.target.value) || 0}})} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono focus:bg-white transition-all" />
+                      <div key={k} className="p-4 bg-slate-50 rounded-2xl">
+                        <label className="text-[13px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">{k}</label>
+                        <input type="number" min="0" placeholder='0' value={v === 0 ? "" : v} onChange={e => setIncomes({...incomes, monthly: {...incomes.monthly, [k]: parseInt(e.target.value) || 0}})} className="w-full bg-transparent border-0 font-mono font-bold text-lg outline-none" />
                       </div>
                     ))}
                   </div>
@@ -527,24 +661,42 @@ const App = () => {
                     <div className="bg-white p-8 rounded-2xl shadow-md">
                       <h3 className="text-md font-bold text-slate-800 mb-6">每月開支</h3>
                         <div className="grid sm:grid-cols-2 gap-4">
-                          {Object.entries(expenses.monthly).map(([k, v]) => (
-                            <div key={k} className="space-y-1">
-                              <label className="text-[15px] font-bold text-slate-400 uppercase tracking-widest ml-1">{k}</label>
-                              <input type="number" min="0" placeholder='0' value={v === 0 ? "" : v} onChange={e => setExpenses({...expenses, monthly: {...expenses.monthly, [k]: parseInt(e.target.value) || 0}})} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono focus:bg-white transition-all" />
-                            </div>
-                          ))}
+                          {Object.keys(EXPENSE_LABELS).map((key) => (
+                      <div key={key} className="p-4 bg-slate-50 rounded-2xl">
+                        <label className="text-[13px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
+                          {EXPENSE_LABELS[key]}
+                        </label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          placeholder='0'
+                          value={expenses.monthly[key] ===0 ? "" : expenses.monthly[key]} 
+                          onChange={e => setExpenses({...expenses, monthly: {...expenses.monthly, [key]: parseInt(e.target.value) || 0}})} 
+                          className="w-full bg-transparent border-0 font-mono font-bold text-lg outline-none" 
+                        />
+                      </div>
+                    ))}
                         </div>
                     </div>  
 
                     <div className="bg-slate-40 p-8 rounded-2xl shadow-md ">
                       <h3 className="text-md font-bold text-slate-800 mb-6">其餘開支</h3>
                         <div className="grid sm:grid-cols-2 gap-4">
-                          {Object.entries(expenses.yearly).map(([k, v]) => (
-                            <div key={k} className="space-y-1">
-                              <label className="text-[15px] font-bold text-slate-400 uppercase tracking-widest ml-1">{k}</label>
-                              <input type="number" min="0" placeholder='0' value={v === 0 ? "" : v} onChange={e => setExpenses({...expenses, yearly: {...expenses.yearly, [k]: parseInt(e.target.value) || 0}})} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono focus:bg-white transition-all" />
-                            </div>
-                          ))}
+                          {Object.keys(FIX_EXPENSE_LABELS).map((key) => (
+                      <div key={key} className="p-4 bg-slate-50 rounded-2xl">
+                        <label className="text-[13px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
+                          {FIX_EXPENSE_LABELS[key]}
+                        </label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          placeholder='0'
+                          value={expenses.yearly[key] ===0 ? "" : expenses.yearly[key]} 
+                          onChange={e => setExpenses({...expenses, yearly: {...expenses.yearly, [key]: parseInt(e.target.value) || 0}})} 
+                          className="w-full bg-transparent border-0 font-mono font-bold text-lg outline-none" 
+                        />
+                      </div>
+                    ))}
                         </div>
                     </div>  
                 </div>
@@ -572,24 +724,54 @@ const App = () => {
         {activeTab === 'fire' && (
            <div className="grid lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="lg:col-span-4 space-y-6">
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
 
                   <h2 className="text-lg font-bold text-slate-800 mb-4">FIRE 參數設定</h2>
-                  <div className="p-4 bg-slate-50 rounded-xl border mb-6">
-                    <span className="text-xs font-bold text-slate-500 uppercase block mb-1">目前總資產</span>
-                    <span className="text-xl font-mono font-bold text-slate-700">${stats.totalAssets.toLocaleString()}</span>
-                  </div>
+                  {/* 下拉式選單：選擇模式 */}
                   <div className="mb-6">
-                    <div className="flex justify-between mb-2">
-                      <label className="text-xs font-bold text-slate-500">設定目標金額</label>
-                      <button onClick={() => setManualGoal(null)} className="text-xs text-indigo-500 hover:underline">還原預設</button>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2 block">選擇達成模式</label>
+                    <div className="relative group">
+                      <select 
+                        value={fireModeId}
+                        onChange={(e) => {
+                          setFireModeId(e.target.value);
+                          setManualGoal(null); // 切換模式時重設手動輸入，使其自動計算
+                        }}
+                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer"
+                      >
+                        {FIRE_MODES.map(mode => (
+                          <option key={mode.id} value={mode.id}>{mode.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+                    </div>
+                    {/* 模式說明 */}
+                    <div className="mt-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
+                       <p className="text-xs text-indigo-700 leading-relaxed italic">
+                         {stats.selectedMode.desc} 
+                         <span className="block mt-1 font-black not-italic">目標為年支出的 {stats.selectedMode.multiplier} 倍。</span>
+                       </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">目標金額</label>
+                      {manualGoal !== null && (
+                        <button onClick={() => setManualGoal(null)} className="text-[10px] text-indigo-500 font-bold hover:underline">還原模式建議</button>
+                      )}
                     </div>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                      <input type="number" value={stats.fireGoal} onChange={(e) => setManualGoal(parseInt(e.target.value) || 0)} className="w-full pl-8 pr-4 py-2 bg-indigo-50 border border-indigo-100 rounded-lg font-mono font-bold text-indigo-700" />
+                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                       <input 
+                         type="number" 
+                         value={stats.fireGoal}
+                         onChange={(e) => setManualGoal(parseInt(e.target.value) || 0)}
+                         className={`w-full pl-10 pr-4 py-4 bg-white border-2 rounded-2xl font-mono font-black text-2xl outline-none transition-all ${manualGoal !== null ? 'border-orange-200 text-orange-600' : 'border-indigo-100 text-indigo-700'}`}
+                       />
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">* 建議 (25倍支出): ${(stats.totalAnnualExpense * 25).toLocaleString()}</p>
                   </div>
+
 
                   <h2 className="text-lg font-bold text-slate-800 mb-6">財務自由參數</h2>
                   <div className="mb-8 p-6 bg-slate-50 rounded-2xl border">
@@ -602,7 +784,7 @@ const App = () => {
                   </div>
                 </div>
              </div>
-             <div className="lg:col-span-8 bg-white p-10 rounded-3xl border border-slate-200 shadow-sm min-h-[400px]">
+             <div className="lg:col-span-8 bg-white p-10 rounded-3xl border border-slate-200 shadow-[0_10px_30px_rgba(0,0,0,0.3)] min-h-[400px]">
                 <h2 className="text-lg font-bold text-slate-800 mb-10 flex items-center gap-2">
                    <GrowthIcon className="w-5 h-5 text-indigo-500" /> 資產成長模擬
                 </h2>
