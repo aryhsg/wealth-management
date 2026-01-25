@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 
 export const useFinanceSync = (user, setters, setStatus) => {
-  const API_BASE_URL = 'http://localhost:8000';
+  const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
   
   // 解構出你原本的 set 方法
   const { setAssets, setExpenses, setIncomes, setManualGoal, setReturnRate } = setters;
