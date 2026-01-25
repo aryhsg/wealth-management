@@ -6,20 +6,20 @@ WealthWise 是一款基於 React 開發的個人財務管理工具，旨在幫�
 
 ## 🚀 核心功能
 
-- **資產與收支追蹤**：直覺的介面紀錄每月收入、開支與資產分佈。
-- **AI 財務分析**：串接 **Google Gemini API**，根據使用者的財務數據自動生成分析報告與改善建議。
-- **FIRE 退休規劃**：內建五種常見的 FIRE 模式（如 Lean FIRE, Fat FIRE 等）計算器，預估達成目標的時間。
-- **報表匯出**：支持將分析結果與財務總覽匯出為 PDF 檔案。
-- **響應式介面**：使用 Tailwind CSS 打造，支援電腦與手機瀏覽。
+- 資產與收支追蹤：直覺的介面紀錄每月收入、開支與資產分佈。
+- AI 財務分析：串接 *Google Gemini API*，根據使用者的財務數據自動生成分析報告與改善建議。
+- FIRE 退休規劃：內建五種常見的 FIRE 模式（如 Lean FIRE, Fat FIRE 等）計算器，預估達成目標的時間。
+- 報表匯出：支持將分析結果與財務總覽匯出為 PDF 檔案。
+- 響應式介面：使用 Tailwind CSS 打造，支援電腦與手機瀏覽。
 
-## 🛠 技術棧 (Tech Stack)
+## 🛠技術棧 (Tech Stack)
 
-- **前端框架**：React.js (Vite)
-- **樣式處理**：Tailwind CSS
-- **AI 整合**：Google Gemini API
-- **數據持久化**：Firebase (Authentication / Firestore)
-- **圖標庫**：Lucide React
-- **文件生成**：jsPDF / html2canvas
+- 前端框架：React.js (Vite)
+- 樣式處理：Tailwind CSS
+- AI 整合：Google Gemini API
+- 數據持久化：Firebase (Authentication / Firestore)
+- 圖標庫：Lucide React
+
 
 ## 📦 快速開始
 
@@ -34,17 +34,14 @@ npm install
 ```
 ### 3. 環境變數設定
 #### 本專案依賴外部 API 服務，請在根目錄建立 .env 檔案，並配置以下金鑰：
-Google Gemini API
-前往 Google AI Studio 申請免費的 API Key。
+- Google Gemini API
+> 前往 Google AI Studio 申請免費的 API Key。
+>在 .env 中加入：VITE_GEMINI_API_KEY=您的金鑰
 
-在 .env 中加入：VITE_GEMINI_API_KEY=您的金鑰
-
-Firebase / Firestore Config
-前往 Firebase Console 建立新專案。
-
-啟用 Firestore Database 與 Authentication。
-
-在專案設定中新增「網頁應用程式」，並取得 SDK 配置資訊。
+- Firebase / Firestore Config
+> 前往 Firebase Console 建立新專案。
+     啟用 Firestore Database 與 Authentication。\
+    在專案設定中新增「網頁應用程式」，並取得 SDK 配置資訊。
 
 將以下資訊對應填入 .env：
 ```
